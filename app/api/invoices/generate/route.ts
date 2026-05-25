@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { invoiceGenerateSchema } from "@/lib/validations/invoice";
 import { calculateInvoiceTotals } from "@/lib/invoice/calculations";
 import { generateZugferdXml } from "@/lib/zugferd/xml";
-import { generateInvoicePdf } from "@/lib/pdf/generate-invoice-pdf";
+import { embedZugferdXML, generateVisualPdf } from "@/lib/pdf/generate";
 
 export async function POST(request: Request) {
   try {
@@ -20,14 +20,18 @@ export async function POST(request: Request) {
     const totals = calculateInvoiceTotals(invoice.lineItems, {
       kleinunternehmerMode: invoice.kleinunternehmerMode,
     });
-    const xml = generateZugferdXml({ invoice, totals });
-    const pdfBytes = await generateInvoicePdf(invoice, totals, xml);
 
-    return new NextResponse(Buffer.from(pdfBytes), {
+    const visualPdfBytes = await generateVisualPdf(invoice, totals);
+    const xmlContent = generateZugferdXml({ invoice, totals });
+    const finalPdfBytes = await embedZugferdXML(visualPdfBytes, xmlContent, {
+      profile: "BASIC",
+    });
+
+    return new NextResponse(Buffer.from(finalPdfBytes), {
       status: 200,
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="${invoice.number}.pdf"`,
+        "Content-Disposition": `attachment; filename="Rechnung-${invoice.number}.pdf"`,
         "X-ZUGFERD-PROFILE": "BASIC",
       },
     });
