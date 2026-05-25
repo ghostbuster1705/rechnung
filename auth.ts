@@ -7,6 +7,16 @@ import { prisma } from "@/lib/prisma";
 import { loginSchema } from "@/lib/validations/auth";
 import { verifyPassword } from "@/lib/auth/password";
 
+const configuredSecret = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET;
+const authSecret = configuredSecret ?? "invoicede-local-dev-secret-change-me";
+
+if (!configuredSecret) {
+  // Stabiler Fallback für lokale Umgebungen, damit Middleware nicht mit MissingSecret crasht.
+  console.warn(
+    "[auth] AUTH_SECRET/NEXTAUTH_SECRET fehlt. Fallback-Secret aktiv (nur lokal verwenden).",
+  );
+}
+
 const providers: Provider[] = [
   Credentials({
     name: "E-Mail & Passwort",
@@ -57,6 +67,7 @@ if (process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET) {
 export const { handlers, signIn, signOut, auth } = NextAuth({
   adapter: PrismaAdapter(prisma),
   trustHost: true,
+  secret: authSecret,
   session: {
     strategy: "jwt",
   },
