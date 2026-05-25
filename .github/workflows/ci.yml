@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - "cursor/**"
+
+jobs:
+  test-and-validate:
+    runs-on: ubuntu-latest
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/invoicede?schema=public
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npm run prisma:generate
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+      - name: Validate ZUGFeRD XML structure
+        run: npx tsx scripts/validate-zugferd.ts
+        env:
+          ZUGFERD_VALIDATOR_ENDPOINT: ${{ secrets.ZUGFERD_VALIDATOR_ENDPOINT }}
+          ZUGFERD_VALIDATOR_TOKEN: ${{ secrets.ZUGFERD_VALIDATOR_TOKEN }}

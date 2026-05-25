@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html.dark body {
+  background: #020617;
+  color: #e2e8f0;
+}
+
+html:not(.dark) body {
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+.input {
+  @apply w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-emerald-500 focus:outline-none;
+}
+
+html:not(.dark) .input {
+  @apply border-slate-300 bg-white text-slate-900 placeholder:text-slate-400;
+}
