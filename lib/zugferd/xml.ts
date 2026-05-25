@@ -24,6 +24,20 @@ function taxCategoryCode(vatRate: number) {
   return vatRate === 0 ? "Z" : "S";
 }
 
+function formatVatId(vatId: string, schemeId: "VA" | "FC") {
+  const cleaned = vatId.replace(/\s/g, "");
+  if (schemeId === "FC") {
+    return cleaned;
+  }
+
+  const normalized = cleaned.toUpperCase();
+  if (!normalized.startsWith("DE")) {
+    return `DE${normalized}`;
+  }
+
+  return normalized;
+}
+
 export function generateZugferdXml({ invoice, totals }: ZugferdDocumentInput) {
   const lineItemsXml = invoice.lineItems
     .map((item, idx) => {
@@ -72,17 +86,20 @@ export function generateZugferdXml({ invoice, totals }: ZugferdDocumentInput) {
     )
     .join("\n");
 
-  const notes = [invoice.invoice.paymentTerms, invoice.notes]
+  const notesXml = [invoice.invoice.paymentTerms, invoice.notes]
     .filter(Boolean)
-    .map((note) => `<ram:IncludedNote><ram:Content>${xmlEscape(note ?? "")}</ram:Content></ram:IncludedNote>`)
+    .map(
+      (note) =>
+        `<ram:IncludedNote><ram:Content>${xmlEscape(note ?? "")}</ram:Content></ram:IncludedNote>`,
+    )
     .join("\n");
 
   const sellerTaxRegistration = invoice.seller.vatId
-    ? `<ram:SpecifiedTaxRegistration><ram:ID schemeID="VA">${xmlEscape(invoice.seller.vatId)}</ram:ID></ram:SpecifiedTaxRegistration>`
-    : `<ram:SpecifiedTaxRegistration><ram:ID schemeID="FC">${xmlEscape(invoice.seller.taxId ?? "")}</ram:ID></ram:SpecifiedTaxRegistration>`;
+    ? `<ram:SpecifiedTaxRegistration><ram:ID schemeID="VA">${xmlEscape(formatVatId(invoice.seller.vatId, "VA"))}</ram:ID></ram:SpecifiedTaxRegistration>`
+    : `<ram:SpecifiedTaxRegistration><ram:ID schemeID="FC">${xmlEscape(formatVatId(invoice.seller.taxId ?? "", "FC"))}</ram:ID></ram:SpecifiedTaxRegistration>`;
 
   const buyerVatXml = invoice.buyer.vatId
-    ? `<ram:SpecifiedTaxRegistration><ram:ID schemeID="VA">${xmlEscape(invoice.buyer.vatId)}</ram:ID></ram:SpecifiedTaxRegistration>`
+    ? `<ram:SpecifiedTaxRegistration><ram:ID schemeID="VA">${xmlEscape(formatVatId(invoice.buyer.vatId, "VA"))}</ram:ID></ram:SpecifiedTaxRegistration>`
     : "";
 
   const exemptionNote = invoice.kleinunternehmerMode
@@ -107,29 +124,29 @@ export function generateZugferdXml({ invoice, totals }: ZugferdDocumentInput) {
   <rsm:ExchangedDocument>
     <ram:ID>${xmlEscape(invoice.number)}</ram:ID>
     <ram:TypeCode>380</ram:TypeCode>
-    ${notes}
-    ${exemptionNote}
-    ${reverseChargeNote}
     <ram:IssueDateTime>
       <udt:DateTimeString format="102">${toDate102(invoice.invoice.issueDate)}</udt:DateTimeString>
     </ram:IssueDateTime>
+    ${notesXml}
+    ${exemptionNote}
+    ${reverseChargeNote}
   </rsm:ExchangedDocument>
   <rsm:SupplyChainTradeTransaction>
     ${lineItemsXml}
     <ram:ApplicableHeaderTradeAgreement>
       <ram:SellerTradeParty>
         <ram:Name>${xmlEscape(invoice.seller.name)}</ram:Name>
+        <ram:DefinedTradeContact>
+          <ram:PersonName>${xmlEscape(invoice.seller.name)}</ram:PersonName>
+          ${invoice.seller.phone ? `<ram:TelephoneUniversalCommunication><ram:CompleteNumber>${xmlEscape(invoice.seller.phone)}</ram:CompleteNumber></ram:TelephoneUniversalCommunication>` : ""}
+          ${invoice.seller.email ? `<ram:EmailURIUniversalCommunication><ram:URIID>${xmlEscape(invoice.seller.email)}</ram:URIID></ram:EmailURIUniversalCommunication>` : ""}
+        </ram:DefinedTradeContact>
         <ram:PostalTradeAddress>
           <ram:PostcodeCode>${xmlEscape(invoice.seller.postalCode)}</ram:PostcodeCode>
           <ram:LineOne>${xmlEscape(invoice.seller.street)}</ram:LineOne>
           <ram:CityName>${xmlEscape(invoice.seller.city)}</ram:CityName>
           <ram:CountryID>${xmlEscape(invoice.seller.country)}</ram:CountryID>
         </ram:PostalTradeAddress>
-        <ram:DefinedTradeContact>
-          <ram:PersonName>${xmlEscape(invoice.seller.name)}</ram:PersonName>
-          ${invoice.seller.phone ? `<ram:TelephoneUniversalCommunication><ram:CompleteNumber>${xmlEscape(invoice.seller.phone)}</ram:CompleteNumber></ram:TelephoneUniversalCommunication>` : ""}
-          ${invoice.seller.email ? `<ram:EmailURIUniversalCommunication><ram:URIID>${xmlEscape(invoice.seller.email)}</ram:URIID></ram:EmailURIUniversalCommunication>` : ""}
-        </ram:DefinedTradeContact>
         ${sellerTaxRegistration}
       </ram:SellerTradeParty>
       <ram:BuyerTradeParty>
